@@ -59,15 +59,28 @@ type ElasticsearchConfig struct {
 }
 
 type RedisConfig struct {
-	Host     string
-	Port     int32
-	Password string
+	Host         string
+	Port         int
+	Password     string
+	DB           int
+	PoolSize     int
+	MinIdleConns int
+	DialTimeout  time.Duration
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
 }
 
 type CassandraConfig struct {
 }
 
 type ZapConfig struct {
+	Level             string
+	Development       bool
+	DisableCaller     bool
+	DisableStacktrace bool
+	Encoding          string
+	OutputPath        string
+	ErrorOutputPath   string
 }
 
 type KafkaConfig struct {
