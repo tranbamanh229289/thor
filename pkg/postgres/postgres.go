@@ -3,8 +3,9 @@ package postgres
 import (
 	"context"
 	"fmt"
-	"loki/pkg/config"
 	"time"
+
+	"thor/pkg/config"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -15,22 +16,22 @@ import (
 type DB struct {
 	write        *pgxpool.Pool
 	read         *pgxpool.Pool
+	log          *zap.Logger
 	readTimeout  time.Duration
 	writeTimeout time.Duration
-	log          *zap.Logger
 }
 
 func (db *DB) HealthCheck(ctx context.Context) error {
 	writeCtx, writeCancel := context.WithTimeout(ctx, db.writeTimeout)
 	defer writeCancel()
 	if err := db.write.Ping(writeCtx); err != nil {
-		return fmt.Errorf("write pool ping %w", err)
+		return fmt.Errorf("write pool ping: %w", err)
 	}
 
 	readCtx, readCancel := context.WithTimeout(ctx, db.readTimeout)
 	defer readCancel()
 	if err := db.read.Ping(readCtx); err != nil {
-		return fmt.Errorf("read pool ping %w", err)
+		return fmt.Errorf("read pool ping: %w", err)
 	}
 	return nil
 }

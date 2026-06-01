@@ -1,0 +1,68 @@
+app:
+    name:
+    env:
+    version:
+
+http_server:
+    host:
+    port:
+    shutdown_timeout:
+    idle_timeout:
+    read_timeout:
+    write_timeout:
+    tls:
+        enable:
+        cert_file:
+        key_file:
+
+graphql_server:
+    host:
+    port:
+
+grpc_server:
+    host:
+    port:
+
+postgres:
+    host:
+    port:
+    database:
+    user:
+    password:
+    ssl_mode:
+    max_conns:
+    min_conns:
+    max_conn_idle_time:
+    max_conn_life_time:
+    timeout:
+
+elasticsearch:
+    host:
+    port:
+
+redis:
+    host:
+    port:
+    password:
+    db:
+    pool_size:
+    min_idle_conns:
+    dial_timeout:
+    read_timeout:
+    write_timeout:
+
+kafka:
+
+zap:
+    level:
+    development:
+    disable_caller:
+    disable_stacktrace:
+    encoding:
+    output_path:
+    error_output_path:
+
+jwt:
+    secret:
+    access_token_ttl:
+    refresh_token_ttl:

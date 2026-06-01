@@ -1,7 +1,7 @@
 package zap
 
 import (
-	"loki/pkg/config"
+	"thor/pkg/config"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
