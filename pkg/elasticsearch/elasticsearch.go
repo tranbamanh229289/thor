@@ -18,7 +18,7 @@ type SearchEngine struct {
 
 func New(ctx context.Context, cfg *config.ElasticsearchConfig, log *zap.Logger) (*SearchEngine, error) {
 	esCfg := elasticsearch.Config{
-		Addresses: cfg.Address,
+		Addresses: cfg.Addresses,
 		Username:  cfg.Username,
 		Password:  cfg.Password,
 	}
@@ -49,7 +49,7 @@ func New(ctx context.Context, cfg *config.ElasticsearchConfig, log *zap.Logger) 
 	}, nil
 }
 
-func (s *SearchEngine) HealCheck(ctx context.Context) error {
+func (s *SearchEngine) HealthCheck(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, s.timeout)
 	defer cancel()
 	res, err := s.client.Cluster.Health(s.client.Cluster.Health.WithContext(ctx))

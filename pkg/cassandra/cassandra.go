@@ -45,7 +45,7 @@ func New(ctx context.Context, cfg *config.CassandraConfig, log *zap.Logger) (*DB
 	}
 
 	if cfg.LocalDC != "" {
-
+		cluster.PoolConfig.HostSelectionPolicy = gocql.DCAwareRoundRobinPolicy(cfg.LocalDC)
 	}
 
 	session, err := cluster.CreateSession()

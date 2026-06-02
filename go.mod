@@ -3,6 +3,7 @@ module thor
 go 1.25.0
 
 require (
+	github.com/confluentinc/confluent-kafka-go/v2 v2.14.1
 	github.com/elastic/go-elasticsearch/v8 v8.19.6
 	github.com/gocql/gocql v1.7.0
 	github.com/jackc/pgx/v5 v5.9.2

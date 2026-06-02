@@ -58,10 +58,10 @@ type PostgresConfig struct {
 }
 
 type ElasticsearchConfig struct {
-	Address  []string      `mapstructure:"address"`
-	Username string        `mapstructure:"username"`
-	Password string        `mapstructure:"password"`
-	Timeout  time.Duration `mapstructure:"timeout"`
+	Addresses []string      `mapstructure:"address"`
+	Username  string        `mapstructure:"username"`
+	Password  string        `mapstructure:"password"`
+	Timeout   time.Duration `mapstructure:"timeout"`
 }
 
 type RedisConfig struct {
@@ -99,8 +99,36 @@ type ZapConfig struct {
 }
 
 type KafkaConfig struct {
+	Producer KafkaProducerConfig
+	Consumer KafkaConsumerConfig
 }
 
+type KafkaProducerConfig struct {
+	BootstrapServers      string
+	Acks                  string
+	Retries               int
+	RetryBackoffMs        int
+	LingerMs              int
+	BatchSize             int
+	CompressType          string
+	EnableIdempotence     bool
+	DeliveryTimeoutMs     int
+	SocketKeepAliveEnable bool
+}
+
+type KafkaConsumerConfig struct {
+	BootstrapServers            string
+	GroupID                     string
+	AutoOffsetReset             string
+	EnableAutoCommit            bool
+	SessionTimeoutMs            int
+	MaxPollIntervalMs           int
+	HeartBeatIntervalMs         int
+	FetchMinBytes               int
+	FetchWaitMaxMs              int
+	PartitionAssignmentStrategy string
+	SocketKeepAliveEnable       bool
+}
 type LokiConfig struct {
 }
 
