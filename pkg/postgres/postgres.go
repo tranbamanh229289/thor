@@ -14,21 +14,21 @@ import (
 )
 
 type DB struct {
-	write        *pgxpool.Pool
-	read         *pgxpool.Pool
-	log          *zap.Logger
-	readTimeout  time.Duration
-	writeTimeout time.Duration
+	write    *pgxpool.Pool
+	read     *pgxpool.Pool
+	log      *zap.Logger
+	writeCfg *config.PostgresConfig
+	readCfg  *config.PostgresConfig
 }
 
 func (db *DB) HealthCheck(ctx context.Context) error {
-	writeCtx, writeCancel := context.WithTimeout(ctx, db.writeTimeout)
+	writeCtx, writeCancel := context.WithTimeout(ctx, db.writeCfg.Timeout)
 	defer writeCancel()
 	if err := db.write.Ping(writeCtx); err != nil {
 		return fmt.Errorf("write pool ping: %w", err)
 	}
 
-	readCtx, readCancel := context.WithTimeout(ctx, db.readTimeout)
+	readCtx, readCancel := context.WithTimeout(ctx, db.readCfg.Timeout)
 	defer readCancel()
 	if err := db.read.Ping(readCtx); err != nil {
 		return fmt.Errorf("read pool ping: %w", err)
@@ -46,7 +46,7 @@ func (db *DB) Close() {
 }
 
 func (db *DB) Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error) {
-	ctx, cancel := context.WithTimeout(ctx, db.writeTimeout)
+	ctx, cancel := context.WithTimeout(ctx, db.writeCfg.Timeout)
 	defer cancel()
 	tag, err := db.write.Exec(ctx, sql, args...)
 	if err != nil {
@@ -55,8 +55,8 @@ func (db *DB) Exec(ctx context.Context, sql string, args ...any) (pgconn.Command
 	return tag, err
 }
 
-func (db *DB) QueryRow(ctx context.Context, dest []any, sql string, args ...any) error {
-	ctx, cancel := context.WithTimeout(ctx, db.readTimeout)
+func (db *DB) QueryRow(ctx context.Context, sql string, dest []any, args ...any) error {
+	ctx, cancel := context.WithTimeout(ctx, db.readCfg.Timeout)
 	defer cancel()
 	err := db.read.QueryRow(ctx, sql, args...).Scan(dest...)
 	if err != nil {
@@ -66,7 +66,7 @@ func (db *DB) QueryRow(ctx context.Context, dest []any, sql string, args ...any)
 }
 
 func (db *DB) Tx(ctx context.Context, fn func(tx pgx.Tx) error) error {
-	ctx, cancel := context.WithTimeout(ctx, db.writeTimeout)
+	ctx, cancel := context.WithTimeout(ctx, db.writeCfg.Timeout)
 	defer cancel()
 
 	tx, err := db.write.Begin(ctx)
@@ -91,32 +91,27 @@ func (db *DB) Tx(ctx context.Context, fn func(tx pgx.Tx) error) error {
 }
 
 func New(ctx context.Context, readCfg *config.PostgresConfig, writeCfg *config.PostgresConfig, log *zap.Logger) (*DB, error) {
-	writePool, err := newPool(ctx, writeCfg)
+	writePool, err := newPool(ctx, writeCfg, log, "write")
 	if err != nil {
-		log.Error("Postgres connection failed", zap.String("role", "write"), zap.Error(err))
-		return nil, fmt.Errorf("postgres %s: %w", "write", err)
-	} else {
-		log.Info("Postgres connected", zap.String("role", "write"))
+		return nil, err
 	}
 
-	readPool, err := newPool(ctx, readCfg)
+	readPool, err := newPool(ctx, readCfg, log, "read")
 	if err != nil {
-		log.Error("Postgres connection failed", zap.String("role", "read"), zap.Error(err))
-		return nil, fmt.Errorf("postgres %s: %w", "read", err)
-	} else {
-		log.Info("Postgres connected", zap.String("role", "read"))
+		writePool.Close()
+		return nil, err
 	}
 
-	return &DB{write: writePool, read: readPool, readTimeout: readCfg.Timeout, writeTimeout: writeCfg.Timeout, log: log}, nil
+	return &DB{write: writePool, read: readPool, readCfg: readCfg, writeCfg: writeCfg, log: log}, nil
 }
 
 func getDSN(cfg *config.PostgresConfig) string {
 	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s", cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.Database, cfg.SSLMode)
 }
 
-func newPool(ctx context.Context, cfg *config.PostgresConfig) (*pgxpool.Pool, error) {
-	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
-	defer cancel()
+func newPool(ctx context.Context, cfg *config.PostgresConfig, log *zap.Logger, role string) (*pgxpool.Pool, error) {
+	var pool *pgxpool.Pool
+	var err error
 
 	dsn := getDSN(cfg)
 	pgxConfig, err := pgxpool.ParseConfig(dsn)
@@ -141,5 +136,26 @@ func newPool(ctx context.Context, cfg *config.PostgresConfig) (*pgxpool.Pool, er
 		pgxConfig.MaxConnLifetime = cfg.MaxConnLifeTime
 	}
 
-	return pgxpool.NewWithConfig(ctx, pgxConfig)
+	retries := cfg.Retries
+	if retries <= 0 {
+		retries = 1
+	}
+	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
+	defer cancel()
+
+	for i := 0; i < retries; i++ {
+		pool, err = pgxpool.NewWithConfig(ctx, pgxConfig)
+		if err == nil {
+			log.Info("Postgres connected", zap.String("role", role))
+			return pool, nil
+		}
+		log.Warn("Postgres connection failed, retrying", zap.String("role", role), zap.Int("attempt:", i+1), zap.Error(err))
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(time.Duration(cfg.RetryBackoffMs) * time.Millisecond):
+		}
+	}
+	return nil, fmt.Errorf("postgres %s: %w", role, err)
 }

@@ -13,9 +13,9 @@ import (
 )
 
 type Cache struct {
-	client  *redis.Client
-	log     *zap.Logger
-	timeout time.Duration
+	client *redis.Client
+	log    *zap.Logger
+	cfg    *config.RedisConfig
 }
 
 func (c *Cache) GetJSON(ctx context.Context, key string, des any) error {
@@ -60,21 +60,24 @@ func New(ctx context.Context, cfg *config.RedisConfig, log *zap.Logger) (*Cache,
 
 	client := redis.NewClient(opts)
 
-	ctx, cancel := context.WithTimeout(ctx, cfg.DialTimeout)
-	defer cancel()
-
-	if err := client.Ping(ctx).Err(); err != nil {
-		log.Error("Redis connect failed", zap.Error(err))
-		_ = client.Close()
-		return nil, err
-	} else {
-		log.Info("Redis connected")
+	var err error
+	for attempt := 0; attempt < cfg.Retries; attempt++ {
+		if err = client.Ping(ctx).Err(); err == nil {
+			log.Info("Redis connected")
+			return &Cache{client: client, log: log, cfg: cfg}, nil
+		}
+		log.Warn("Redis connect failed", zap.Error(err))
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(time.Duration(cfg.RetryBackoffMs)):
+		}
 	}
-	return &Cache{client: client, log: log, timeout: cfg.DialTimeout}, nil
+	return nil, fmt.Errorf("Redis connect failed: %w", err)
 }
 
 func (c *Cache) HealthCheck(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	ctx, cancel := context.WithTimeout(ctx, c.cfg.DialTimeout)
 	defer cancel()
 
 	if err := c.client.Ping(ctx).Err(); err != nil {

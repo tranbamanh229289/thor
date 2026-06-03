@@ -54,38 +54,46 @@ type PostgresConfig struct {
 	MinConns        int32         `mapstructure:"min_conns"`
 	MaxConnIdleTime time.Duration `mapstructure:"max_conn_idle_time"`
 	MaxConnLifeTime time.Duration `mapstructure:"max_conn_life_time"`
+	Retries         int           `mapstructure:"retry"`
+	RetryBackoffMs  int           `mapstructure:"retry_backoff_ms"`
 	Timeout         time.Duration `mapstructure:"timeout"`
 }
 
 type ElasticsearchConfig struct {
-	Addresses []string      `mapstructure:"address"`
-	Username  string        `mapstructure:"username"`
-	Password  string        `mapstructure:"password"`
-	Timeout   time.Duration `mapstructure:"timeout"`
+	Addresses      []string      `mapstructure:"address"`
+	Username       string        `mapstructure:"username"`
+	Password       string        `mapstructure:"password"`
+	Retries        int           `mapstructure:"retry"`
+	RetryBackoffMs int           `mapstructure:"retry_backoff_ms"`
+	Timeout        time.Duration `mapstructure:"timeout"`
 }
 
 type RedisConfig struct {
-	Host         string        `mapstructure:"host"`
-	Port         int           `mapstructure:"port"`
-	Password     string        `mapstructure:"password"`
-	DB           int           `mapstructure:"db"`
-	PoolSize     int           `mapstructure:"pool_size"`
-	MinIdleConns int           `mapstructure:"min_idle_conns"`
-	DialTimeout  time.Duration `mapstructure:"dial_timeout"`
-	ReadTimeout  time.Duration `mapstructure:"read_timeout"`
-	WriteTimeout time.Duration `mapstructure:"write_timeout"`
+	Host           string        `mapstructure:"host"`
+	Port           int           `mapstructure:"port"`
+	Password       string        `mapstructure:"password"`
+	DB             int           `mapstructure:"db"`
+	PoolSize       int           `mapstructure:"pool_size"`
+	MinIdleConns   int           `mapstructure:"min_idle_conns"`
+	DialTimeout    time.Duration `mapstructure:"dial_timeout"`
+	ReadTimeout    time.Duration `mapstructure:"read_timeout"`
+	WriteTimeout   time.Duration `mapstructure:"write_timeout"`
+	Retries        int           `mapstructure:"retry"`
+	RetryBackoffMs int           `mapstructure:"retry_backoff_ms"`
 }
 
 type CassandraConfig struct {
-	Hosts       []string      `mapstructure:"hosts"`
-	Port        int           `mapstructure:"port"`
-	Keyspace    string        `mapstructure:"keyspace"`
-	Username    string        `mapstructure:"username"`
-	Password    string        `mapstructure:"password"`
-	LocalDC     string        `mapstructure:"local_dc"`
-	Consistency string        `mapstructure:"consistency"`
-	NumConns    int           `mapstructure:"num_conns"`
-	Timeout     time.Duration `mapstructure:"timeout"`
+	Hosts          []string      `mapstructure:"hosts"`
+	Port           int           `mapstructure:"port"`
+	Keyspace       string        `mapstructure:"keyspace"`
+	Username       string        `mapstructure:"username"`
+	Password       string        `mapstructure:"password"`
+	LocalDC        string        `mapstructure:"local_dc"`
+	Consistency    string        `mapstructure:"consistency"`
+	NumConns       int           `mapstructure:"num_conns"`
+	Retries        int           `mapstructure:"retry"`
+	RetryBackoffMs int           `mapstructure:"retry_backoff_ms"`
+	Timeout        time.Duration `mapstructure:"timeout"`
 }
 
 type ZapConfig struct {
@@ -99,21 +107,21 @@ type ZapConfig struct {
 }
 
 type KafkaConfig struct {
-	Producer KafkaProducerConfig
-	Consumer KafkaConsumerConfig
+	Producer KafkaProducerConfig `mapstructure:"producer"`
+	Consumer KafkaConsumerConfig `mapstructure:"consumer"`
+	Security KafkaSecurityConfig `mapstructure:"security"`
 }
 
 type KafkaProducerConfig struct {
-	BootstrapServers      string
-	Acks                  string
-	Retries               int
-	RetryBackoffMs        int
-	LingerMs              int
-	BatchSize             int
-	CompressType          string
-	EnableIdempotence     bool
-	DeliveryTimeoutMs     int
-	SocketKeepAliveEnable bool
+	BootstrapServers      string `mapstructure:"bootstrap_server"`
+	Acks                  string `mapstructure:"acks"`
+	Retries               int    `mapstructure:"retries"`
+	RetryBackoffMs        int    `mapstructure:"retries_backoff_ms"`
+	LingerMs              int    `mapstructure:"linger_ms"`
+	BatchSize             int    `mapstructure:"batch_size"`
+	CompressType          string `mapstructure:"compress_type"`
+	DeliveryTimeoutMs     int    `mapstructure:"delivery_timeout_ms"`
+	SocketKeepAliveEnable bool   `mapstructure:"socket_keep_alive_enable"`
 }
 
 type KafkaConsumerConfig struct {
@@ -128,6 +136,13 @@ type KafkaConsumerConfig struct {
 	FetchWaitMaxMs              int
 	PartitionAssignmentStrategy string
 	SocketKeepAliveEnable       bool
+}
+
+type KafkaSecurityConfig struct {
+	SecurityProtocol string
+	SaslMechanism    string
+	SaslUsername     string
+	SaslPassword     string
 }
 type LokiConfig struct {
 }
