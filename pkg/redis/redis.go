@@ -47,6 +47,7 @@ func (c *Cache) Delete(ctx context.Context, key string) error {
 }
 
 func New(ctx context.Context, cfg *config.RedisConfig, log *zap.Logger) (*Cache, error) {
+	var err error
 	opts := &redis.Options{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 		Password:     cfg.Password,
@@ -58,19 +59,23 @@ func New(ctx context.Context, cfg *config.RedisConfig, log *zap.Logger) (*Cache,
 		WriteTimeout: cfg.WriteTimeout,
 	}
 
+	retries := cfg.Retries
+	if retries <= 0 {
+		retries = 1
+	}
+
 	client := redis.NewClient(opts)
 
-	var err error
-	for attempt := 0; attempt < cfg.Retries; attempt++ {
+	for attempt := 0; attempt < retries; attempt++ {
 		if err = client.Ping(ctx).Err(); err == nil {
 			log.Info("Redis connected")
 			return &Cache{client: client, log: log, cfg: cfg}, nil
 		}
-		log.Warn("Redis connect failed", zap.Error(err))
+		log.Warn("Redis connect failed, retrying", zap.Int("attempt", attempt+1), zap.Error(err))
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case <-time.After(time.Duration(cfg.RetryBackoffMs)):
+		case <-time.After(time.Duration(cfg.RetryBackoffMs) * time.Millisecond):
 		}
 	}
 	return nil, fmt.Errorf("Redis connect failed: %w", err)

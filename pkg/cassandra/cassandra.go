@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"thor/pkg/config"
+	"time"
 
 	"github.com/gocql/gocql"
 	"go.uber.org/zap"
@@ -20,7 +21,7 @@ func (db *DB) HealthCheck(ctx context.Context) error {
 	defer cancel()
 
 	if err := db.session.Query("SELECT now() from system.local").WithContext(ctx).Exec(); err != nil {
-		return fmt.Errorf("cassandra ping : %w", err)
+		return fmt.Errorf("cassandra ping: %w", err)
 	}
 	return nil
 }
@@ -28,7 +29,7 @@ func (db *DB) HealthCheck(ctx context.Context) error {
 func (db *DB) Exec(ctx context.Context, stmt string, values ...any) error {
 	if err := db.session.Query(stmt, values...).WithContext(ctx).Exec(); err != nil {
 		db.log.Error("Cassandra exec failed:", zap.String("stmt", stmt), zap.Error(err))
-		return fmt.Errorf("cassandra exe: %w", err)
+		return fmt.Errorf("cassandra exec: %w", err)
 	}
 	return nil
 }
@@ -89,19 +90,31 @@ func New(ctx context.Context, cfg *config.CassandraConfig, log *zap.Logger) (*DB
 		cluster.PoolConfig.HostSelectionPolicy = gocql.DCAwareRoundRobinPolicy(cfg.LocalDC)
 	}
 
-	session, err := cluster.CreateSession()
-	if err != nil {
-		log.Error("Cassandra connection failed", zap.Error(err))
-		return nil, fmt.Errorf("cassandra connect: %w", err)
+	if cfg.Timeout > 0 {
+		cluster.Timeout = cfg.Timeout
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
-	defer cancel()
+	var err error
+	var session *gocql.Session
 
-	if err := session.Query("SELECT now() from system.local").WithContext(ctx).Exec(); err != nil {
-		session.Close()
-		return nil, fmt.Errorf("cassandra ping : %w", err)
+	retries := cfg.Retries
+	if retries == 0 {
+		retries = 1
 	}
+	for attempt := 0; attempt < retries; attempt++ {
+		session, err = cluster.CreateSession()
+		if err == nil {
+			log.Info("Cassandra connected")
+			return &DB{session: session, log: log, cfg: cfg}, nil
+		}
 
-	return &DB{session: session, log: log, cfg: cfg}, nil
+		log.Warn("Cassandra connect failed, retrying", zap.Int("attempt", attempt+1), zap.Error(err))
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(time.Duration(cfg.RetryBackoffMs) * time.Millisecond):
+		}
+	}
+	return nil, fmt.Errorf("cassandra connect failed: %w", err)
+
 }

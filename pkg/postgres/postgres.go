@@ -71,7 +71,7 @@ func (db *DB) Tx(ctx context.Context, fn func(tx pgx.Tx) error) error {
 
 	tx, err := db.write.Begin(ctx)
 	if err != nil {
-
+		db.log.Error("Begin Transaction failed", zap.Error(err))
 		return fmt.Errorf("begin tx: %w", err)
 	}
 
@@ -79,11 +79,13 @@ func (db *DB) Tx(ctx context.Context, fn func(tx pgx.Tx) error) error {
 		tx.Rollback(ctx)
 	}()
 
-	if err := fn(tx); err != nil {
+	if err = fn(tx); err != nil {
+		db.log.Error("Transaction failed", zap.Error(err))
 		return err
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err = tx.Commit(ctx); err != nil {
+		db.log.Error("Transaction commit failed", zap.Error(err))
 		return fmt.Errorf("commit tx: %w", err)
 	}
 
@@ -110,9 +112,6 @@ func getDSN(cfg *config.PostgresConfig) string {
 }
 
 func newPool(ctx context.Context, cfg *config.PostgresConfig, log *zap.Logger, role string) (*pgxpool.Pool, error) {
-	var pool *pgxpool.Pool
-	var err error
-
 	dsn := getDSN(cfg)
 	pgxConfig, err := pgxpool.ParseConfig(dsn)
 
@@ -140,16 +139,20 @@ func newPool(ctx context.Context, cfg *config.PostgresConfig, log *zap.Logger, r
 	if retries <= 0 {
 		retries = 1
 	}
-	ctx, cancel := context.WithTimeout(ctx, cfg.Timeout)
-	defer cancel()
+
+	pool, err := pgxpool.NewWithConfig(ctx, pgxConfig)
+	if err != nil {
+		log.Error("Postgres create pool failed", zap.Error(err))
+		return nil, fmt.Errorf("Postgres create pool failed: %w", err)
+	}
 
 	for i := 0; i < retries; i++ {
-		pool, err = pgxpool.NewWithConfig(ctx, pgxConfig)
-		if err == nil {
+		if err = pool.Ping(ctx); err == nil {
 			log.Info("Postgres connected", zap.String("role", role))
 			return pool, nil
 		}
-		log.Warn("Postgres connection failed, retrying", zap.String("role", role), zap.Int("attempt:", i+1), zap.Error(err))
+
+		log.Warn("Postgres connection failed, retrying", zap.String("role", role), zap.Int("attempt", i+1), zap.Error(err))
 
 		select {
 		case <-ctx.Done():
