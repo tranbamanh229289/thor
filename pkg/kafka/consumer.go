@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"thor/pkg/config"
@@ -15,6 +16,8 @@ type Consumer struct {
 	cfg      *config.KafkaConsumerConfig
 }
 
+type Handler func(ctx context.Context, msg *ReceiveMessage) error
+
 func NewConsumer(cfg *config.KafkaConfig, log *zap.Logger) (*Consumer, error) {
 	consumer, err := kafka.NewConsumer(getConsumerConfigMap(cfg))
 	if err != nil {
@@ -23,6 +26,57 @@ func NewConsumer(cfg *config.KafkaConfig, log *zap.Logger) (*Consumer, error) {
 	}
 	log.Info("Consumer created successfully")
 	return &Consumer{consumer: consumer, log: log, cfg: &cfg.Consumer}, nil
+}
+
+func (c *Consumer) Subscribe(ctx context.Context, topics []string, handler Handler) error {
+	if err := c.consumer.SubscribeTopics(topics, nil); err != nil {
+		return fmt.Errorf("subscribe topics %v:%w", topics, err)
+	}
+	c.log.Info("Subscribe to topics", zap.Strings("topics", topics))
+
+	defer func() {
+		c.log.Info("Consumer is closing, committing offsets...")
+		if err := c.consumer.Close(); err != nil {
+			c.log.Error("Consumer closed is failed", zap.Error(err))
+		}
+	}()
+
+	for {
+		ev := c.consumer.Poll(c.cfg.PollIntervalMs)
+		if ev == nil {
+			continue
+		}
+		switch e := ev.(type) {
+		case *kafka.Message:
+			c.processMessage(ctx, e, handler)
+		case kafka.Error:
+			c.log.Error("Consumer error", zap.Error(e))
+			return fmt.Errorf("consumer error:%w", e)
+		case kafka.OffsetsCommitted:
+			c.log.Warn("Offset commit failed", zap.Error(e.Error))
+		}
+	}
+}
+
+func (c *Consumer) processMessage(ctx context.Context, km *kafka.Message, handler Handler) {
+	msg := fromKafkaMessage(km)
+
+	if err := handler(ctx, msg); err != nil {
+		c.log.Error("Message processing failed", zap.Error(err))
+
+	}
+	if _, err := c.consumer.CommitMessage(km); err != nil {
+		c.log.Error("Message commit offset failed", zap.Error(err))
+
+	}
+
+}
+
+func (c *Consumer) Close(ctx context.Context) error {
+	if _, err := c.consumer.Commit(); err != nil {
+		return fmt.Errorf("Final commit failed: %w", err)
+	}
+	return c.consumer.Close()
 }
 
 func getConsumerConfigMap(cfg *config.KafkaConfig) *kafka.ConfigMap {
@@ -50,7 +104,7 @@ func getConsumerConfigMap(cfg *config.KafkaConfig) *kafka.ConfigMap {
 	if strings.HasPrefix(cfg.Security.SecurityProtocol, "SASL") {
 		_ = cm.SetKey("sasl.mechanism", cfg.Security.SaslMechanism)
 		_ = cm.SetKey("sasl.username", cfg.Security.SaslUsername)
-		_ = cm.SetKey("sasl_password", cfg.Security.SaslPassword)
+		_ = cm.SetKey("sasl.password", cfg.Security.SaslPassword)
 	}
 	return cm
 }

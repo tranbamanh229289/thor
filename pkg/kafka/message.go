@@ -6,23 +6,31 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 )
 
-type Message struct {
+type SendMessage struct {
 	Topic     string
-	Key       string
+	Key       []byte
+	Value     []byte
+	Headers   map[string]string
+	Partition int32
+}
+
+type ReceiveMessage struct {
+	Topic     string
+	Key       []byte
 	Value     []byte
 	Headers   map[string]string
 	Partition int32
 	Offset    int64
-	Timestamp time.Time
+	Timestamp int64
 }
 
-func toKafkaMessage(msg *Message) *kafka.Message {
+func toKafkaMessage(msg *SendMessage) *kafka.Message {
 	km := &kafka.Message{
 		TopicPartition: kafka.TopicPartition{
 			Topic:     &msg.Topic,
 			Partition: kafka.PartitionAny,
 		},
-		Key:           []byte(msg.Key),
+		Key:           msg.Key,
 		Value:         msg.Value,
 		Timestamp:     time.Now(),
 		TimestampType: kafka.TimestampCreateTime,
@@ -34,4 +42,21 @@ func toKafkaMessage(msg *Message) *kafka.Message {
 		})
 	}
 	return km
+}
+
+func fromKafkaMessage(km *kafka.Message) *ReceiveMessage {
+	msg := &ReceiveMessage{
+		Topic:     *km.TopicPartition.Topic,
+		Key:       km.Key,
+		Value:     km.Value,
+		Partition: km.TopicPartition.Partition,
+		Offset:    int64(km.TopicPartition.Offset),
+		Timestamp: km.Timestamp.UnixMilli(),
+	}
+	var headers = make(map[string]string)
+	for _, header := range km.Headers {
+		headers[header.Key] = string(header.Value)
+	}
+	msg.Headers = headers
+	return msg
 }

@@ -16,8 +16,9 @@ type Producer struct {
 	cfg      *config.KafkaProducerConfig
 }
 
-func (p *Producer) Publish(ctx context.Context, msg Message) error {
-	km := toKafkaMessage(&msg)
+func (p *Producer) Publish(ctx context.Context, msg *SendMessage) error {
+	km := toKafkaMessage(msg)
+	p.log.Info("Producer is starting send message", zap.String("clientID", p.cfg.ClientID))
 	if err := p.producer.Produce(km, nil); err != nil {
 		p.log.Error("Kafka send async message error", zap.Error(err))
 		return fmt.Errorf("Kafka send async message error: %w", err)
@@ -25,7 +26,8 @@ func (p *Producer) Publish(ctx context.Context, msg Message) error {
 	return nil
 }
 
-func (p *Producer) PublishBatch(ctx context.Context, msgs []Message) error {
+func (p *Producer) PublishBatch(ctx context.Context, msgs []*SendMessage) error {
+	p.log.Info("Producer is starting send batch message", zap.String("clientID", p.cfg.ClientID))
 	for _, msg := range msgs {
 		if err := p.Publish(ctx, msg); err != nil {
 			return err
@@ -34,9 +36,10 @@ func (p *Producer) PublishBatch(ctx context.Context, msgs []Message) error {
 	return nil
 }
 
-func (p *Producer) PublishSync(ctx context.Context, msg Message) error {
+func (p *Producer) PublishSync(ctx context.Context, msg *SendMessage) error {
 	deliveryChan := make(chan kafka.Event, 1)
-	km := toKafkaMessage(&msg)
+	km := toKafkaMessage(msg)
+	p.log.Info("Producer is starting send message", zap.String("clientID", p.cfg.ClientID))
 
 	if err := p.producer.Produce(km, deliveryChan); err != nil {
 		p.log.Error("Kafka send message error", zap.Error(err))
@@ -59,6 +62,13 @@ func (p *Producer) PublishSync(ctx context.Context, msg Message) error {
 	}
 }
 
+func (p *Producer) Close() {
+	if p.producer != nil {
+		p.producer.Flush(p.cfg.FlushTimeout)
+		p.Close()
+	}
+}
+
 func NewProducer(cfg *config.KafkaConfig, log *zap.Logger) (*Producer, error) {
 	producer, err := kafka.NewProducer(getProducerConfigMap(cfg))
 	if err != nil {
@@ -74,7 +84,8 @@ func NewProducer(cfg *config.KafkaConfig, log *zap.Logger) (*Producer, error) {
 func getProducerConfigMap(cfg *config.KafkaConfig) *kafka.ConfigMap {
 	cm := &kafka.ConfigMap{
 		// connect
-		"bootstraps.servers": cfg.Producer.BootstrapServers,
+		"bootstrap.servers": cfg.Producer.BootstrapServers,
+		"client.id":         cfg.Producer.ClientID,
 		// retry
 		"retries":             cfg.Producer.Retries,
 		"retry.backoff.ms":    cfg.Producer.RetryBackoffMs,
@@ -82,9 +93,9 @@ func getProducerConfigMap(cfg *config.KafkaConfig) *kafka.ConfigMap {
 		"enable.idempotence":  cfg.Producer.Acks == "all",
 		"delivery.timeout.ms": cfg.Producer.DeliveryTimeoutMs,
 		// batch process
-		"linger.ms":     cfg.Producer.LingerMs,
-		"batch.size":    cfg.Producer.BatchSize,
-		"compress.type": cfg.Producer.CompressType,
+		"linger.ms":        cfg.Producer.LingerMs,
+		"batch.size":       cfg.Producer.BatchSize,
+		"compression.type": cfg.Producer.CompressionType,
 		// network
 		"socket.keepalive.enable": cfg.Producer.SocketKeepAliveEnable,
 	}

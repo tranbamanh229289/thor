@@ -52,6 +52,34 @@ redis:
     write_timeout:
 
 kafka:
+    security:
+        security_protocol:
+        sasl_mechanism:
+        sasl_username:
+        sasl_password:
+    producer:
+        client_id:
+        bootstrap_servers:
+        acks:
+        retries:
+        retry_backoff_ms:
+        linger_ms:
+        batch_size:
+        compression_type:
+        delivery_timeout_ms:
+        socket_keep_alive_enable:
+    consumer:
+        bootstrap_servers:
+        group_id:
+        auto_offset_reset:
+        enable_auto_commit_ms:
+        session_timeout_ms:
+        max_poll_intervals_ms:
+        heart_beat_intervals_ms:
+        fetch_min_bytes:
+        fetch_wait_max_ms:
+        partition_assignment_strategy:
+        socket_keep_alive_enable:
 
 zap:
     level:

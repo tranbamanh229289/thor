@@ -113,36 +113,39 @@ type KafkaConfig struct {
 }
 
 type KafkaProducerConfig struct {
-	BootstrapServers      string `mapstructure:"bootstrap_server"`
+	BootstrapServers      string `mapstructure:"bootstrap_servers"`
+	ClientID              string `mapstructure:"client_id"`
 	Acks                  string `mapstructure:"acks"`
 	Retries               int    `mapstructure:"retries"`
 	RetryBackoffMs        int    `mapstructure:"retries_backoff_ms"`
 	LingerMs              int    `mapstructure:"linger_ms"`
 	BatchSize             int    `mapstructure:"batch_size"`
-	CompressType          string `mapstructure:"compress_type"`
+	CompressionType       string `mapstructure:"compression_type"`
 	DeliveryTimeoutMs     int    `mapstructure:"delivery_timeout_ms"`
 	SocketKeepAliveEnable bool   `mapstructure:"socket_keep_alive_enable"`
+	FlushTimeout          int
 }
 
 type KafkaConsumerConfig struct {
-	BootstrapServers            string
-	GroupID                     string
-	AutoOffsetReset             string
-	EnableAutoCommit            bool
-	SessionTimeoutMs            int
-	MaxPollIntervalMs           int
-	HeartBeatIntervalMs         int
-	FetchMinBytes               int
-	FetchWaitMaxMs              int
-	PartitionAssignmentStrategy string
-	SocketKeepAliveEnable       bool
+	BootstrapServers            string `mapstructure:"bootstrap_servers"`
+	GroupID                     string `mapstructure:"group_id"`
+	AutoOffsetReset             string `mapstructure:"auto_offset_reset"`
+	EnableAutoCommit            bool   `mapstructure:"enable_auto_commit"`
+	SessionTimeoutMs            int    `mapstructure:"session_timeout_ms"`
+	PollIntervalMs              int    `mapstructure:"poll_interval_ms"`
+	MaxPollIntervalMs           int    `mapstructure:"max_poll_interval_ms"`
+	HeartBeatIntervalMs         int    `mapstructure:"heart_beat_interval_ms"`
+	FetchMinBytes               int    `mapstructure:"fetch_min_bytes"`
+	FetchWaitMaxMs              int    `mapstructure:"fetch_wait_max_ms"`
+	PartitionAssignmentStrategy string `mapstructure:"partition_assignment_strategy"`
+	SocketKeepAliveEnable       bool   `mapstructure:"socket_keep_alive_enable"`
 }
 
 type KafkaSecurityConfig struct {
-	SecurityProtocol string
-	SaslMechanism    string
-	SaslUsername     string
-	SaslPassword     string
+	SecurityProtocol string `mapstructure:"security_protocol"`
+	SaslMechanism    string `mapstructure:"sasl_mechanism"`
+	SaslUsername     string `mapstructure:"sasl_user"`
+	SaslPassword     string `mapstructure:"sasl_password"`
 }
 type LokiConfig struct {
 }
