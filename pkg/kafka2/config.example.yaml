@@ -1,0 +1,54 @@
+# Per-service Kafka config template.
+# Copy to services/<name>/config/kafka.yaml and fill in values.
+
+kafka:
+  service_name: my-service
+
+  producer:
+    bootstrap_servers: "broker1:9092,broker2:9092,broker3:9092"
+    client_id: my-service-producer
+    acks: all
+    retries: 5
+    retry_backoff_ms: 100
+    linger_ms: 20
+    batch_size: 65536
+    compression_type: lz4
+    delivery_timeout_ms: 120000
+    flush_timeout_ms: 10000
+    socket_keep_alive_enable: true
+
+  consumer:
+    bootstrap_servers: "broker1:9092,broker2:9092,broker3:9092"
+    group_id: my-service
+    auto_offset_reset: earliest
+    enable_auto_commit: false
+    session_timeout_ms: 45000
+    heartbeat_interval_ms: 15000
+    max_poll_interval_ms: 300000
+    poll_timeout_ms: 100
+    fetch_min_bytes: 1024
+    fetch_max_bytes: 52428800
+    partition_assignment_strategy: cooperative-sticky
+    worker_buffer_size: 256
+    socket_keep_alive_enable: true
+
+  retry:
+    max_attempts: 5
+    initial_backoff_ms: 1000
+    max_backoff_ms: 60000
+
+  outbox:
+    enabled: true
+    poll_interval_ms: 500
+    batch_size: 100
+
+  idempotency:
+    enabled: true
+    store: redis
+    ttl: 168h
+
+  security:
+    security_protocol: PLAINTEXT
+    sasl_mechanism: ""
+    sasl_user: ""
+    sasl_password: ""
