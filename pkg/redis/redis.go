@@ -12,6 +12,14 @@ import (
 	"go.uber.org/zap"
 )
 
+type ICache interface {
+	Get(ctx context.Context, key string) (string, error)
+	Set(ctx context.Context, key string, value string, ttl time.Duration) error
+	GetJSON(ctx context.Context, key string, des any) error
+	SetJSON(ctx context.Context, key string, value any, ttl time.Duration) error
+	Delete(ctx context.Context, key string) error
+}
+
 type Cache struct {
 	client *redis.Client
 	log    *zap.Logger

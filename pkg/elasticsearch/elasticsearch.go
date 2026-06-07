@@ -13,6 +13,18 @@ import (
 	"go.uber.org/zap"
 )
 
+type ISearchEngine interface {
+	CreateIndex(ctx context.Context, index string, mapping *types.TypeMapping) error
+	DeleteIndex(ctx context.Context, index string) error
+	Index(ctx context.Context, index, docID string, doc any) error
+	Update(ctx context.Context, index, docID string, partialDoc any) error
+	Delete(ctx context.Context, index, docID string) error
+	Get(ctx context.Context, index, docID string) (*get.Response, error)
+	BulkIndex(ctx context.Context, index string, items []BulkIndex) error
+	Search(ctx context.Context, index string, query *types.Query, from, size *int) (*search.Response, error)
+	Count(ctx context.Context, index string, query *types.Query) (int64, error)
+	Aggregate(ctx context.Context, index string, query *types.Query, agg map[string]types.Aggregations) (*search.Response, error)
+}
 type SearchEngine struct {
 	client *elasticsearch.TypedClient
 	log    *zap.Logger
@@ -20,8 +32,8 @@ type SearchEngine struct {
 }
 
 type BulkIndex struct {
-	ID       string
 	Action   string
+	ID       string
 	Document any
 }
 
@@ -226,7 +238,7 @@ func (s *SearchEngine) Aggregate(ctx context.Context, index string, query *types
 	ctx, cancel := context.WithTimeout(ctx, s.cfg.Timeout)
 	defer cancel()
 
-	req := s.client.Search().Index(index).Size(0) // Thường lấy stats thì set size = 0 để tăng tốc
+	req := s.client.Search().Index(index).Size(0)
 	if query != nil {
 		req.Query(query)
 	}

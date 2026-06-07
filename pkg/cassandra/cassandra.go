@@ -10,6 +10,12 @@ import (
 	"go.uber.org/zap"
 )
 
+type IDB interface {
+	Exec(ctx context.Context, stmt string, values ...any) error
+	QueryRow(ctx context.Context, stmt string, dest []any, values ...any) error
+	QueryMap(ctx context.Context, stmt string, values ...any) ([]map[string]any, error)
+}
+
 type DB struct {
 	session *gocql.Session
 	log     *zap.Logger

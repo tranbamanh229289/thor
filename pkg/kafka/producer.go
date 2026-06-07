@@ -111,12 +111,12 @@ func getProducerConfigMap(cfg *config.KafkaConfig) *kafka.ConfigMap {
 
 func (p *Producer) handleDeliveryReports() {
 	for e := range p.producer.Events() {
-		switch ev := e.(type) {
-		case *kafka.Message:
-			if ev.TopicPartition.Error != nil {
-				p.log.Error("Delivery failed", zap.Error(ev.TopicPartition.Error))
-			}
+		msg, ok := e.(*kafka.Message)
+		if !ok || msg.TopicPartition.Error == nil {
+			continue
 		}
-
+		if msg.TopicPartition.Topic != nil {
+			p.log.Error("Delivery failed", zap.String("topic", *msg.TopicPartition.Topic), zap.Error(msg.TopicPartition.Error))
+		}
 	}
 }

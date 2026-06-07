@@ -1,5 +1,7 @@
 package kafka2
 
+import "context"
+
 // Chain composes middlewares around a handler. First middleware is outermost.
 func Chain(handler Handler, mws ...Middleware) Handler {
 	for i := len(mws) - 1; i >= 0; i-- {

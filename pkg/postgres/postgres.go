@@ -13,6 +13,12 @@ import (
 	"go.uber.org/zap"
 )
 
+type IDB interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	QueryRow(ctx context.Context, sql string, dest []any, args ...any) error
+	Tx(ctx context.Context, fn func(tx pgx.Tx) error) error
+}
+
 type DB struct {
 	write    *pgxpool.Pool
 	read     *pgxpool.Pool
