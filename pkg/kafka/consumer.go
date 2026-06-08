@@ -10,13 +10,20 @@ import (
 	"go.uber.org/zap"
 )
 
+type IConsumer interface {
+	Use(mw ...Middleware)
+	Subscribe(ctx context.Context, topics []string, handler Handler) error
+	Close()
+}
 type Consumer struct {
-	consumer *kafka.Consumer
-	log      *zap.Logger
-	cfg      *config.KafkaConsumerConfig
+	consumer    *kafka.Consumer
+	middlewares []Middleware
+	log         *zap.Logger
+	cfg         *config.KafkaConsumerConfig
 }
 
-type Handler func(ctx context.Context, msg *ReceiveMessage) error
+type Handler func(ctx context.Context, msg *Event) error
+type Middleware func(Handler) Handler
 
 func NewConsumer(cfg *config.KafkaConfig, log *zap.Logger) (*Consumer, error) {
 	consumer, err := kafka.NewConsumer(getConsumerConfigMap(cfg))
@@ -28,11 +35,15 @@ func NewConsumer(cfg *config.KafkaConfig, log *zap.Logger) (*Consumer, error) {
 	return &Consumer{consumer: consumer, log: log, cfg: &cfg.Consumer}, nil
 }
 
+func (c *Consumer) Use(mw ...Middleware) {
+	c.middlewares = append(c.middlewares, mw...)
+}
+
 func (c *Consumer) Subscribe(ctx context.Context, topics []string, handler Handler) error {
 	if err := c.consumer.SubscribeTopics(topics, nil); err != nil {
-		return fmt.Errorf("subscribe topics %v:%w", topics, err)
+		return fmt.Errorf("consumer subscribe topics error %v:%w", topics, err)
 	}
-	c.log.Info("Subscribe to topics", zap.Strings("topics", topics))
+	c.log.Info("Consumer subscribed topics", zap.Strings("topics", topics))
 
 	defer func() {
 		c.log.Info("Consumer is closing, committing offsets...")
@@ -41,8 +52,13 @@ func (c *Consumer) Subscribe(ctx context.Context, topics []string, handler Handl
 		}
 	}()
 
+	var poolIntervalMs int
+	if c.cfg.PollIntervalMs == 0 {
+		poolIntervalMs = 100
+	}
+
 	for {
-		ev := c.consumer.Poll(c.cfg.PollIntervalMs)
+		ev := c.consumer.Poll(poolIntervalMs)
 		if ev == nil {
 			continue
 		}
@@ -59,9 +75,12 @@ func (c *Consumer) Subscribe(ctx context.Context, topics []string, handler Handl
 }
 
 func (c *Consumer) processMessage(ctx context.Context, km *kafka.Message, handler Handler) {
-	msg := fromKafkaMessage(km)
+	event, err := decodeEvent(km)
+	if err != nil {
+		c.log.Error("Kafka decode event error", zap.Error(err))
+	}
 
-	if err := handler(ctx, msg); err != nil {
+	if err := handler(ctx, event); err != nil {
 		c.log.Error("Message processing failed", zap.Error(err))
 
 	}
@@ -69,7 +88,6 @@ func (c *Consumer) processMessage(ctx context.Context, km *kafka.Message, handle
 		c.log.Error("Message commit offset failed", zap.Error(err))
 
 	}
-
 }
 
 func (c *Consumer) Close(ctx context.Context) error {

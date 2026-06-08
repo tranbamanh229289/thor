@@ -10,7 +10,7 @@ import (
 )
 
 type Config struct {
-	App           AppConfig           `mapstructure:"app"`
+	Service       ServiceConfig       `mapstructure:"app"`
 	HTTPServer    HTTPServerConfig    `mapstructure:"http_server"`
 	GRPCServer    GRPCServerConfig    `mapstructure:"grpc_server"`
 	GraphQLServer GraphQLServerConfig `mapstructure:"graphql_server"`
@@ -23,7 +23,7 @@ type Config struct {
 	JWT           JWTConfig           `mapstructure:"jwt"`
 }
 
-type AppConfig struct {
+type ServiceConfig struct {
 	Name    string `mapstructure:"name"`
 	Env     string `mapstructure:"env"`
 	Version string `mapstructure:"version"`
@@ -107,9 +107,12 @@ type ZapConfig struct {
 }
 
 type KafkaConfig struct {
-	Producer KafkaProducerConfig `mapstructure:"producer"`
-	Consumer KafkaConsumerConfig `mapstructure:"consumer"`
-	Security KafkaSecurityConfig `mapstructure:"security"`
+	Producer    KafkaProducerConfig    `mapstructure:"producer"`
+	Consumer    KafkaConsumerConfig    `mapstructure:"consumer"`
+	Security    KafkaSecurityConfig    `mapstructure:"security"`
+	Retry       KafkaRetryConfig       `mapstructure:"retry"`
+	Idempotency KafkaIdempotencyConfig `mapstructure:"idempotency"`
+	Outbox      KafkaOutboxConfig      `mapstructure:"outbox"`
 }
 
 type KafkaProducerConfig struct {
@@ -132,9 +135,9 @@ type KafkaConsumerConfig struct {
 	AutoOffsetReset             string `mapstructure:"auto_offset_reset"`
 	EnableAutoCommit            bool   `mapstructure:"enable_auto_commit"`
 	SessionTimeoutMs            int    `mapstructure:"session_timeout_ms"`
+	HeartBeatIntervalMs         int    `mapstructure:"heart_beat_interval_ms"`
 	PollIntervalMs              int    `mapstructure:"poll_interval_ms"`
 	MaxPollIntervalMs           int    `mapstructure:"max_poll_interval_ms"`
-	HeartBeatIntervalMs         int    `mapstructure:"heart_beat_interval_ms"`
 	FetchMinBytes               int    `mapstructure:"fetch_min_bytes"`
 	FetchWaitMaxMs              int    `mapstructure:"fetch_wait_max_ms"`
 	PartitionAssignmentStrategy string `mapstructure:"partition_assignment_strategy"`
@@ -147,6 +150,16 @@ type KafkaSecurityConfig struct {
 	SaslUsername     string `mapstructure:"sasl_user"`
 	SaslPassword     string `mapstructure:"sasl_password"`
 }
+
+type KafkaRetryConfig struct {
+}
+
+type KafkaOutboxConfig struct {
+}
+
+type KafkaIdempotencyConfig struct {
+}
+
 type LokiConfig struct {
 }
 

@@ -5,10 +5,19 @@ import (
 	"fmt"
 	"strings"
 	"thor/pkg/config"
+	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/v2/kafka"
 	"go.uber.org/zap"
 )
+
+type IProducer interface {
+	Publish(ctx context.Context, event *Event) error
+	PublishSync(ctx context.Context, event *Event) error
+	PublishBatch(ctx context.Context, events []*Event) error
+	Flush(timeout time.Duration) int
+	Close() error
+}
 
 type Producer struct {
 	producer *kafka.Producer
@@ -16,8 +25,13 @@ type Producer struct {
 	cfg      *config.KafkaProducerConfig
 }
 
-func (p *Producer) Publish(ctx context.Context, msg *SendMessage) error {
-	km := toKafkaMessage(msg)
+func (p *Producer) Publish(ctx context.Context, event *Event) error {
+	km, err := encodeEvent(event)
+	if err != nil {
+		p.log.Error("Kafka decode event error", zap.Error(err))
+		return fmt.Errorf("kafka encode event error: %w", err)
+	}
+
 	p.log.Info("Producer is starting send message", zap.String("clientID", p.cfg.ClientID))
 	if err := p.producer.Produce(km, nil); err != nil {
 		p.log.Error("Kafka send async message error", zap.Error(err))
@@ -26,19 +40,22 @@ func (p *Producer) Publish(ctx context.Context, msg *SendMessage) error {
 	return nil
 }
 
-func (p *Producer) PublishBatch(ctx context.Context, msgs []*SendMessage) error {
+func (p *Producer) PublishBatch(ctx context.Context, events []*Event) error {
 	p.log.Info("Producer is starting send batch message", zap.String("clientID", p.cfg.ClientID))
-	for _, msg := range msgs {
-		if err := p.Publish(ctx, msg); err != nil {
+	for _, event := range events {
+		if err := p.Publish(ctx, event); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (p *Producer) PublishSync(ctx context.Context, msg *SendMessage) error {
+func (p *Producer) PublishSync(ctx context.Context, event *Event) error {
 	deliveryChan := make(chan kafka.Event, 1)
-	km := toKafkaMessage(msg)
+	km, err := encodeEvent(event)
+	if err != nil {
+		return fmt.Errorf("kafka encode event error: %w", err)
+	}
 	p.log.Info("Producer is starting send message", zap.String("clientID", p.cfg.ClientID))
 
 	if err := p.producer.Produce(km, deliveryChan); err != nil {
@@ -56,16 +73,33 @@ func (p *Producer) PublishSync(ctx context.Context, msg *SendMessage) error {
 		}
 		if m.TopicPartition.Error != nil {
 			p.log.Error("Delivery failed", zap.Error(m.TopicPartition.Error))
-			return fmt.Errorf("delivery failed topic %s:%w", msg.Topic, m.TopicPartition.Error)
+			return fmt.Errorf("delivery failed topic %s:%w", event.Topic, m.TopicPartition.Error)
 		}
 		return nil
 	}
+}
+
+func (p *Producer) Flush(timeout time.Duration) int {
+	if p.producer != nil {
+		return p.producer.Flush(int(timeout.Milliseconds()))
+	}
+	return 0
 }
 
 func (p *Producer) Close() {
 	if p.producer != nil {
 		p.producer.Flush(p.cfg.FlushTimeout)
 		p.Close()
+	}
+}
+
+func (p *Producer) handleDeliveryReports() {
+	for e := range p.producer.Events() {
+		msg, ok := e.(*kafka.Message)
+		if !ok || msg.TopicPartition.Error == nil {
+			continue
+		}
+		p.log.Error("Delivery failed", zap.String("topic", *msg.TopicPartition.Topic), zap.Error(msg.TopicPartition.Error))
 	}
 }
 
@@ -107,16 +141,4 @@ func getProducerConfigMap(cfg *config.KafkaConfig) *kafka.ConfigMap {
 		_ = cm.SetKey("sasl.password", cfg.Security.SaslPassword)
 	}
 	return cm
-}
-
-func (p *Producer) handleDeliveryReports() {
-	for e := range p.producer.Events() {
-		msg, ok := e.(*kafka.Message)
-		if !ok || msg.TopicPartition.Error == nil {
-			continue
-		}
-		if msg.TopicPartition.Topic != nil {
-			p.log.Error("Delivery failed", zap.String("topic", *msg.TopicPartition.Topic), zap.Error(msg.TopicPartition.Error))
-		}
-	}
 }

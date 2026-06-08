@@ -4,13 +4,13 @@ import "time"
 
 // Config holds Kafka settings for a single microservice.
 type Config struct {
-	ServiceName string         `mapstructure:"service_name"`
-	Producer    ProducerConfig `mapstructure:"producer"`
-	Consumer    ConsumerConfig `mapstructure:"consumer"`
-	Retry       RetryConfig    `mapstructure:"retry"`
-	Outbox      OutboxConfig   `mapstructure:"outbox"`
+	ServiceName string            `mapstructure:"service_name"`
+	Producer    ProducerConfig    `mapstructure:"producer"`
+	Consumer    ConsumerConfig    `mapstructure:"consumer"`
+	Retry       RetryConfig       `mapstructure:"retry"`
+	Outbox      OutboxConfig      `mapstructure:"outbox"`
 	Idempotency IdempotencyConfig `mapstructure:"idempotency"`
-	Security    SecurityConfig `mapstructure:"security"`
+	Security    SecurityConfig    `mapstructure:"security"`
 }
 
 type ProducerConfig struct {
@@ -23,8 +23,8 @@ type ProducerConfig struct {
 	BatchSize             int    `mapstructure:"batch_size"`
 	CompressionType       string `mapstructure:"compression_type"`
 	DeliveryTimeoutMs     int    `mapstructure:"delivery_timeout_ms"`
-	FlushTimeoutMs        int    `mapstructure:"flush_timeout_ms"`
 	SocketKeepAliveEnable bool   `mapstructure:"socket_keep_alive_enable"`
+	FlushTimeoutMs        int    `mapstructure:"flush_timeout_ms"`
 }
 
 type ConsumerConfig struct {
